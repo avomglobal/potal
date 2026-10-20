@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Student Portal</title>
+<style>
+  :root{
+    --ink:#1d2b26; --muted:#5d6b66; --line:#d9ded9; --paper:#f1f3ef; --white:#fff;
+    --brand:#0f4c3a; --brand-2:#17694f; --accent:#e0a526; --drawer:#1b2622; --drawer-2:#25322d;
+    --note-bg:#fdf2d0; --note-line:#ecd68b; --note-ink:#6b4f06;
+    --info-bg:#dff1ee; --info-line:#a9d6cf; --info-ink:#0c5147;
+    --ok:#2f7d4f; --bad:#b3372c;
+    --serif:Georgia,"Times New Roman",serif; --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:var(--sans);color:var(--ink);background:var(--paper);min-height:100vh;padding-top:60px;padding-bottom:78px;line-height:1.5}
+  button,input,select,textarea{font:inherit;color:inherit}
+  a{color:var(--brand-2)}
+  :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+  /* top bar */
+  .topbar{position:fixed;top:0;left:0;right:0;height:60px;background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:20}
+  .icon-btn{background:none;border:0;width:44px;height:44px;display:grid;place-items:center;border-radius:10px;cursor:pointer}
+  .icon-btn:hover{background:var(--paper)}
+  .brand{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--brand);letter-spacing:.2px}
+  .brand small{display:block;font-family:var(--sans);font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.6px;margin-top:-3px}
+  .top-right{display:flex;align-items:center;gap:4px}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--line);display:grid;place-items:center;color:var(--muted)}
+  .badge-dot{position:relative}
+  .badge-dot::after{content:"";position:absolute;top:9px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--bad);border:2px solid #fff}
+
+  /* drawer */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;bottom:0;left:0;width:min(82vw,320px);background:var(--drawer);color:#e8ede9;transform:translateX(-100%);transition:transform .22s ease;z-index:50;overflow-y:auto}
+  .drawer.open{transform:none}
+  .profile{padding:28px 18px 20px;text-align:center;background:linear-gradient(135deg,#0f4c3a,#1d7a5a 55%,#c99a2b);color:#fff}
+  .profile .big-avatar{width:84px;height:84px;border-radius:50%;background:#d6dad7;margin:0 auto 10px;display:grid;place-items:center;color:#8a948f}
+  .profile h2{font-family:var(--serif);font-size:20px}
+  .profile .meta{font-size:13px;opacity:.92;margin-top:2px}
+  .profile .status{margin-top:8px;font-size:13px}
+  .profile .status b{letter-spacing:.3px}
+  .nav-title{padding:18px 18px 8px;font-size:13px;color:#8d9a94}
+  .nav-item{display:flex;align-items:center;gap:14px;width:100%;padding:15px 18px;background:none;border:0;color:inherit;text-align:left;cursor:pointer;font-size:16px}
+  .nav-item:hover{background:var(--drawer-2)}
+  .nav-item.active{background:var(--accent);color:#2a2000}
+  .nav-item .chev{margin-left:auto;transition:transform .2s}
+  .nav-item[aria-expanded="true"] .chev{transform:rotate(180deg)}
+  .sub{display:none;background:#151d1a}
+  .sub.open{display:block}
+  .sub button{display:block;width:100%;text-align:left;padding:12px 18px 12px 58px;background:none;border:0;color:#c9d3ce;cursor:pointer;font-size:15px}
+  .sub button:hover{background:var(--drawer-2)}
+  .nav-sep{border:0;border-top:1px solid #34423c;margin:10px 18px}
+
+  /* bottom tabs */
+  .tabs{position:fixed;left:0;right:0;bottom:0;height:70px;background:var(--white);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);z-index:20;padding-bottom:env(safe-area-inset-bottom)}
+  .tab{background:none;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;color:var(--muted);cursor:pointer}
+  .tab svg{width:24px;height:24px}
+  .tab.active{color:var(--brand)}
+  .tab.center{position:relative}
+  .tab.center .orb{position:absolute;top:-22px;width:58px;height:58px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;box-shadow:0 3px 10px rgba(15,76,58,.4)}
+  .tab.center span.lbl{margin-top:34px}
+
+  /* page */
+  main{max-width:720px;margin:0 auto;padding:22px 16px 30px}
+  h1{font-family:var(--serif);font-size:30px;line-height:1.15;padding-bottom:12px;position:relative;margin-bottom:18px}
+  h1::after{content:"";position:absolute;left:0;bottom:0;width:90px;height:3px;background:var(--brand)}
+  .lead{margin-bottom:16px;color:#34423c}
+  .note,.info{border-radius:8px;padding:14px 16px;margin:14px 0;font-size:15px}
+  .note{background:var(--note-bg);border:1px solid var(--note-line);color:var(--note-ink)}
+  .info{background:var(--info-bg);border:1px solid var(--info-line);color:var(--info-ink)}
+  .panel{background:var(--white);border:1px solid var(--line);border-radius:8px;margin:16px 0;overflow:hidden}
+  .panel > header{padding:14px 16px;background:#f7f8f6;border-bottom:1px solid var(--line);font-family:var(--serif);font-size:19px;font-weight:700}
+  .panel .body{padding:16px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:14px;font-weight:600;margin-bottom:5px}
+  .field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1px solid #b9c1bb;border-radius:6px;background:#fff;font-size:16px}
+  .field input[readonly]{background:#eef0ed;color:#46544e}
+  .field textarea{min-height:120px;resize:vertical}
+  .hint{font-size:13px;color:var(--muted);margin-top:4px}
+  .err{color:var(--bad);font-size:13px;margin-top:4px;display:none}
+  .field.invalid input,.field.invalid select,.field.invalid textarea{border-color:var(--bad)}
+  .field.invalid .err{display:block}
+  .check{display:flex;gap:10px;align-items:flex-start}
+  .check input{width:20px;height:20px;margin-top:3px;flex:none}
+  .check label{font-weight:400;margin:0}
+  .btn{display:inline-block;border:0;border-radius:8px;padding:13px 22px;font-weight:600;cursor:pointer;font-size:16px}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.primary:hover{background:var(--brand-2)}
+  .btn.ghost{background:#fff;border:1px solid var(--brand);color:var(--brand)}
+  .btn.block{width:100%}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+
+  /* steps */
+  .step{background:#fff;border:1px solid var(--line);border-radius:8px;margin:10px 0}
+  .step summary{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;font-weight:600}
+  .step summary::-webkit-details-marker{display:none}
+  .pill{font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px}
+  .pill.done{background:#d9f0e1;color:#1d6a3d}
+  .pill.todo{background:#fde6c8;color:#8a5200}
+  .step .inner{padding:0 16px 16px;color:#34423c;font-size:15px}
+  .stat{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+  .stat div{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px}
+  .stat b{display:block;font-size:22px;font-family:var(--serif)}
+  .stat span{font-size:13px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:15px}
+  th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#f7f8f6;font-size:13px}
+
+  .sub{position:relative}
+  .sub::before{content:"";position:absolute;left:38px;top:8px;bottom:8px;width:2px;background:#3a4842}
+  .sub button::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#8d9a94;margin:0 14px 1px -22px}
+  .sub button.active{color:#fff}
+  .sub button.active::before{background:var(--accent)}
+  .field label input,.field label select,.field label textarea{font-weight:400;margin-top:5px}
+  .field label.chip{display:inline-flex;font-weight:400;margin:0}
+  .field .chip input{width:auto;padding:0;margin:0}
+  .chip{align-items:center;gap:6px;border:1px solid #b9c1bb;border-radius:99px;padding:8px 14px;background:#fff;cursor:pointer}
+  .hero{background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:22px}
+  .hero-top{background:linear-gradient(135deg,#0f4c3a,#1d7a5a 55%,#c99a2b);color:#fff;text-align:center;padding:26px 16px 90px}
+  .hero-top h2{font-family:var(--serif);font-size:24px}
+  .hero-photo{width:132px;height:132px;border-radius:50%;margin:-76px auto 0;background:linear-gradient(#e4e6e4,#c3c8c4);border:6px solid #fff;box-shadow:0 0 0 4px #b9b09a;display:grid;place-items:center;text-align:center;font-weight:700;font-size:15px;padding:18px;position:relative}
+  .badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:20px 12px 22px}
+  .badge{background:var(--accent);color:#2a2000;font-weight:700;font-size:15px;padding:7px 14px;border-radius:6px}
+  .linklist button{display:flex;align-items:center;gap:20px;width:100%;padding:17px 22px;background:#fff;border:0;border-top:1px solid var(--line);text-align:left;font-size:17px;cursor:pointer;color:#34423c}
+  .linklist button:hover{background:#f7f8f6}
+  .linklist svg{width:24px;height:24px;color:#4a5752;fill:currentColor;flex:none}
+  .program{border-radius:8px;background:linear-gradient(135deg,#6d4f10,#a9791f);color:#fff;padding:20px 18px 26px}
+  .program .tag{display:inline-block;background:#fff;color:var(--ink);font-weight:700;font-size:14px;padding:5px 12px;border-radius:6px;margin-bottom:10px}
+  .program h3{font-family:var(--serif);font-size:26px;line-height:1.2;font-weight:400}
+  .mtable{border-radius:8px;overflow:hidden;border:1px solid var(--line);background:#fff}
+  .mhead,.mrow{display:grid;grid-template-columns:1.5fr 1fr auto;gap:10px;align-items:center;padding:12px}
+  .mhead{background:#2d3a35;color:#fff;font-weight:700;font-size:14px;border-bottom:3px solid var(--brand)}
+  .mgroup{background:#e6e9e5;padding:14px 12px;font-family:var(--serif);font-size:18px}
+  .mgroup small{display:block;font-size:14px;color:#8a5a00;font-family:var(--sans)}
+  .mrow{border-top:1px solid var(--line)}
+  .mrow a{font-weight:600;display:block}
+  .mrow small{color:var(--muted)}
+  .status-pill{background:#6b7570;color:#fff;font-size:13px;font-weight:600;padding:6px 10px;border-radius:99px;text-align:center}
+  .btn-offers{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:10px 12px;font-weight:600;cursor:pointer}
+  .foot{margin-top:34px;color:var(--muted);font-size:15px}
+  .foot h4{margin:20px 0 8px;color:var(--ink);font-size:16px}
+  .foot a{display:block;margin:6px 0}
+  .foot p a{display:inline;margin:0}
+  body.auth{padding:0}
+  body.auth .topbar,body.auth .tabs,body.auth .drawer,body.auth .scrim{display:none}
+  .auth-card{max-width:420px;margin:0 auto;padding:36px 18px}
+  .auth-card .brand{margin-bottom:26px}
+  .auth-card p{margin-top:14px;text-align:center}
+  .arow{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:8px 0;cursor:pointer}
+  .arow small{display:block;color:var(--muted);font-size:13px;font-weight:400}
+  .pill.bad{background:#f6d4d0;color:#8c2a20}
+  .status-pill.ok{background:#2f7d4f}
+  .status-pill.wait{background:#a9791f}
+  .dl{margin-bottom:6px}
+  .dl dt{font-size:13px;color:var(--muted)}
+  .dl dd{margin:0 0 10px;word-break:break-word;white-space:pre-line}
+  .row-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .sub-h{font-family:var(--serif);font-size:20px;margin:22px 0 8px}
+  .toast{pointer-events:none;position:fixed;left:50%;bottom:92px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:12px 18px;border-radius:8px;opacity:0;transition:.25s;z-index:60;max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .hidden{display:none}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  @media (min-width:900px){
+    body{padding-bottom:30px}
+    .tabs{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<header class="topbar">
+  <button class="icon-btn" id="menuBtn" aria-label="Open menu">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
+  <div class="brand" id="brandName"></div>
+  <div class="top-right">
+    <button class="icon-btn badge-dot" aria-label="Notifications" data-go="notifications">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5-6.7V3a2 2 0 0 0-4 0v1.3A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>
+    </button>
+    <button class="icon-btn" aria-label="Account" data-go="account">
+      <span class="avatar"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4.5"/><path d="M3.5 21c0-4.4 3.8-7 8.5-7s8.5 2.6 8.5 7z"/></svg></span>
+    </button>
+  </div>
+</header>
+
+<!-- Drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Main navigation">
+  <div class="profile">
+    <div class="big-avatar"><svg width="52" height="52" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4.5"/><path d="M3.5 21c0-4.4 3.8-7 8.5-7s8.5 2.6 8.5 7z"/></svg></div>
+    <h2 id="pName"></h2>
+    <div class="meta" id="pId"></div>
+    <div class="meta" id="pUser"></div>
+    <div class="meta" id="pBal"></div>
+    <div class="meta" id="pAvail"></div>
+    <div class="status">Status: <b id="pStatus"></b></div>
+  </div>
+  <div class="nav-title">Navigation</div>
+  <button class="nav-item active" data-go="home"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 12h3v9h5v-6h4v6h5v-9h3z"/></svg>My page</button>
+
+  <button class="nav-item" data-toggle="sub-student" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4.5"/><path d="M3.5 21c0-4.4 3.8-7 8.5-7s8.5 2.6 8.5 7z"/></svg>Student<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+  <div class="sub" id="sub-student"><button data-go="profile">Profile</button><button data-go="application">Application</button><button data-go="documents">Documents</button><button data-go="transcript">Transcript</button><button data-go="password">Change password</button></div>
+
+  <button class="nav-item" data-toggle="sub-finance" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2h-2v2.1c-2.3.4-4 1.9-4 4 0 2.5 2 3.4 4.4 4 1.9.5 2.6.9 2.6 1.7 0 .9-.9 1.5-2.2 1.5-1.4 0-2.3-.6-2.5-1.7H7.2c.2 2 1.7 3.3 3.8 3.7V20h2v-2.2c2.4-.4 4-1.9 4-3.9 0-2.4-1.9-3.3-4.3-3.9-2-.5-2.7-1-2.7-1.8 0-.8.8-1.4 2-1.4s2 .6 2.2 1.5h2.2c-.2-1.8-1.5-3.1-3.4-3.5z"/></svg>Finance<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+  <div class="sub" id="sub-finance"><button data-go="pay">Make payment</button><button data-go="statement">Statement of account</button><button data-go="plan">My payment plan</button></div>
+
+  <button class="nav-item" data-toggle="sub-modules" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1z"/></svg>Modules<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+  <div class="sub" id="sub-modules"><button data-go="modules">Modules</button><button data-go="prereg">My pre-registrations</button><button data-go="enrol">My enrolments</button></div>
+
+  <button class="nav-item" data-toggle="sub-feedback" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>Feedback<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+  <div class="sub" id="sub-feedback"><button data-go="suggestions">Suggestions</button><button data-go="modeval">Module evaluation</button><button data-go="syseval">System evaluation</button></div>
+
+  <button class="nav-item hidden" id="adminNav" data-toggle="sub-admin" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/></svg>Staff<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+  <div class="sub" id="sub-admin"><button data-go="adminApps">Applications</button><button data-go="adminPay">Payments</button><button data-go="adminPrereg">Pre-registrations</button></div>
+
+  <button class="nav-item" data-go="help"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 16h-2v-2h2zm1.8-7.6c-.9.8-1.8 1.2-1.8 2.6h-2c0-2 1.1-2.9 2-3.6.6-.5 1-.8 1-1.4 0-.7-.6-1.2-1.4-1.2-.9 0-1.5.6-1.6 1.4H8.9C9 6.6 10.4 5.5 12.1 5.5c1.7 0 3.4 1 3.4 2.7 0 1.1-.6 1.7-.7 2.2z"/></svg>Help</button>
+  <hr class="nav-sep">
+  <button class="nav-item" id="logoutBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M16 8l4 4-4 4M20 12H9"/></svg>Logout</button>
+</aside>
+
+<!-- Views -->
+<main id="view"></main>
+
+<!-- Bottom tabs -->
+<nav class="tabs" aria-label="Quick navigation">
+  <button class="tab active" data-go="home"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 12h3v9h5v-6h4v6h5v-9h3z"/></svg>My page</button>
+  <button class="tab" data-go="application"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5M8 12h8v1.6H8zm0 3.5h8v1.6H8z"/></svg>Application</button>
+  <button class="tab center" data-go="modules"><span class="orb"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5c3-1 6-1 9 1 3-2 6-2 9-1v14c-3-1-6-1-9 1-3-2-6-2-9-1z"/></svg></span><span class="lbl">Modules</span></button>
+  <button class="tab" data-go="help"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 16h-2v-2h2zm1.8-7.6c-.9.8-1.8 1.2-1.8 2.6h-2c0-2 1.1-2.9 2-3.6.6-.5 1-.8 1-1.4 0-.7-.6-1.2-1.4-1.2-.9 0-1.5.6-1.6 1.4H8.9C9 6.6 10.4 5.5 12.1 5.5c1.7 0 3.4 1 3.4 2.7 0 1.1-.6 1.7-.7 2.2z"/></svg>Help</button>
+  <button class="tab" data-go="account"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4.5"/><path d="M3.5 21c0-4.4 3.8-7 8.5-7s8.5 2.6 8.5 7z"/></svg>Account</button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============ CONFIG: edit these ============ */
+const CONFIG = {
+  schoolName: "Your School",
+  tagline: "Student Portal",
+  supportEmail: "admissions@yourschool.example",
+  student: {
+    name: "Student Name",
+    id: "ST-000001",
+    username: "student0001",
+    currentBalance: 0,
+    availableBalance: 0,
+    status: "INQUIRY",
+    email: "student@example.com",
+    phone: "",
+    country: "",
+    programme: ""
+  },
+  programme: "Programme name",
+  contact: { website: "yourschool.example", email: "info@yourschool.example", phone: "", address: "" },
+  links: [
+    { label: "About us", url: "#" },
+    { label: "Programmes", url: "#" },
+    { label: "Verify certificates", url: "#" }
+  ],
+  moduleGroups: [
+    { name: "Foundation courses", items: [
+      { title: "Induction Module", code: "IND100", status: "Not completed", offers: 1 },
+      { title: "Introduction to Postgraduate Study", code: "FNT203", status: "Not completed", offers: 1 } ] },
+    { name: "Core requirements", note: "(required modules)", items: [
+      { title: "Core Module One", code: "CORE701", status: "Not completed", offers: 2 } ] },
+    { name: "Elective courses", note: "(choose 1 out of 3)", items: [
+      { title: "Elective A", code: "ELE801", status: "Not completed", offers: 2 },
+      { title: "Elective B", code: "ELE802", status: "Not completed", offers: 2 },
+      { title: "Elective C", code: "ELE803", status: "Not completed", offers: 2 } ] }
+  ],
+  checklist: [
+    { title: "Create account", done: true, text: "Your account was created successfully." },
+    { title: "Complete application form", done: false, text: "Fill in the application form and save it." },
+    { title: "Submit scholarship application", done: false, text: "Complete every section, then save your application." },
+    { title: "Accept offer", done: false, text: "Once you receive an offer, accept it here." }
+  ]
+};
+/* ============ In-memory store (swap for Google Apps Script calls later) ============ */
+const store = { application: {} };
+
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const money = n => "$" + Number(n).toFixed(2);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* header / profile */
+$("#brandName").innerHTML = `${esc(CONFIG.schoolName)}<small>${esc(CONFIG.tagline)}</small>`;
+const S = CONFIG.student;
+function renderProfile(){
+  $("#pName").textContent = S.name;
+  $("#pId").textContent = S.id;
+  $("#pUser").textContent = "Username: " + S.username;
+  $("#pBal").textContent = "Current balance: " + money(S.currentBalance);
+  $("#pAvail").textContent = "Available balance: " + money(S.availableBalance);
+  $("#pStatus").textContent = S.status;
+}
+renderProfile();
+
+/* ---------- server calls (Google Apps Script) ---------- */
+const DEMO = !(window.google && google.script && google.script.run);
+const tokenStore = {
+  mem: null,
+  get(){ try { return sessionStorage.getItem("sp_token") || this.mem; } catch(e){ return this.mem; } },
+  set(t){ this.mem = t; try { t ? sessionStorage.setItem("sp_token", t) : sessionStorage.removeItem("sp_token"); } catch(e){} }
+};
+function api(fn, ...args){
+  if (DEMO) return Promise.resolve({ ok:true, data:null, demo:true });
+  return new Promise(resolve => {
+    google.script.run
+      .withSuccessHandler(r => resolve(r || { ok:false, error:"No response from the server." }))
+      .withFailureHandler(() => resolve({ ok:false, error:"Can't reach the server. Check your connection and try again." }))
+      [fn](...args);
+  });
+}
+async function authed(fn, ...args){
+  const r = await api(fn, tokenStore.get(), ...args);
+  if (!r.ok && r.code === "SESSION") { tokenStore.set(null); showAuth("Your session expired. Sign in again."); }
+  return r;
+}
+async function logout(){
+  if (DEMO) { toast("Demo mode. Sign-in works once this is deployed to Apps Script."); return; }
+  await api("logout", tokenStore.get());
+  tokenStore.set(null);
+  showAuth("You've signed out.");
+}
+
+/* drawer */
+const drawer = $("#drawer"), scrim = $("#scrim");
+const openDrawer = () => { drawer.classList.add("open"); scrim.classList.add("open"); };
+const closeDrawer = () => { drawer.classList.remove("open"); scrim.classList.remove("open"); };
+$("#menuBtn").onclick = openDrawer;
+scrim.onclick = closeDrawer;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+$$("[data-toggle]").forEach(b => b.onclick = () => {
+  const sub = document.getElementById(b.dataset.toggle);
+  const open = sub.classList.toggle("open");
+  b.setAttribute("aria-expanded", open);
+});
+$("#logoutBtn").onclick = () => { closeDrawer(); logout(); };
+
+/* toast */
+let tt;
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(()=>t.classList.remove("show"), 2800); }
+
+/* routing */
+const views = {};
+function go(name){
+  if (!views[name]) name = "home";
+  $("#view").innerHTML = views[name]() + footer();
+  const after = views[name].after; if (after) after();
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.go === name));
+  $$(".sub button").forEach(b => b.classList.toggle("active", b.dataset.go === name));
+  $$(".nav-item[data-toggle]").forEach(h => {
+    const sub = document.getElementById(h.dataset.toggle), hit = !!$(".sub button.active", sub);
+    h.classList.toggle("active", hit);
+    if (hit) { sub.classList.add("open"); h.setAttribute("aria-expanded","true"); }
+  });
+  $$(".nav-item[data-go]").forEach(t => t.classList.toggle("active", t.dataset.go === name));
+  closeDrawer();
+  window.scrollTo(0,0);
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("a");
+  if (a && a.getAttribute("href") === "#") e.preventDefault();
+  const of = e.target.closest("[data-offers]");
+  if (of) { store.offerFor = of.dataset.offers; go("offers"); return; }
+  if (e.target.closest("[data-logout]")) { logout(); return; }
+  const el = e.target.closest("[data-go]");
+  if (el) go(el.dataset.go);
+});
+
+/* ---------- views ---------- */
+views.home = () => `
+  <h1>My page</h1>
+  <p class="lead">Welcome, ${esc(S.name.split(" ")[0])}. Follow the steps below to complete your application.</p>
+  <div class="stat">
+    <div><b>${money(S.currentBalance)}</b><span>Current balance</span></div>
+    <div><b>${esc(S.status)}</b><span>Your status</span></div>
+  </div>
+  ${CONFIG.checklist.map((s,i)=>`
+    <details class="step" ${i===1?"open":""}>
+      <summary><span class="pill ${s.done?"done":"todo"}">${s.done?"Completed":"To do"}</span>${esc(s.title)}</summary>
+      <div class="inner">${esc(s.text)}${s.title.includes("application")?`<div style="margin-top:12px"><button class="btn primary" data-go="application">Open application form</button></div>`:""}</div>
+    </details>`).join("")}
+`;
+
+views.application = () => {
+  const a = store.application;
+  const v = k => esc(a[k] ?? "");
+  const sel = (k, opts) => `<select name="${k}" required><option value="">Select…</option>${opts.map(o=>`<option ${a[k]===o?"selected":""}>${o}</option>`).join("")}</select>`;
+  return `
+  <h1>Scholarship application form</h1>
+  <p class="lead">To be considered for a scholarship, complete and submit this form.</p>
+  <div class="note"><b>Please note</b> that to keep your changes, you must tap <b>Save application</b> at the end of the page.</div>
+
+  <form id="appForm" novalidate>
+    <section class="panel">
+      <header>Section 1: Applicant information</header>
+      <div class="body">
+        <div class="info">These details match what you entered earlier. If anything is wrong, <a href="#" data-go="profile">edit your profile</a> or email <a href="mailto:${esc(CONFIG.supportEmail)}">${esc(CONFIG.supportEmail)}</a>.</div>
+        <div class="field"><label>Full name</label><input value="${esc(S.name)}" readonly></div>
+        <div class="field"><label>Student ID</label><input value="${esc(S.id)}" readonly></div>
+        <div class="field"><label>Email</label><input value="${esc(S.email)}" readonly></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>Section 2: Education and work</header>
+      <div class="body">
+        <div class="field"><label for="f-level">Highest qualification</label>
+          ${sel("level",["Secondary school","Certificate","Diploma","Bachelor's degree","Master's degree"])}
+          <div class="err">Choose your highest qualification.</div></div>
+        <div class="field"><label for="f-inst">Institution attended</label><input id="f-inst" name="institution" value="${v("institution")}" required><div class="err">Enter the name of your institution.</div></div>
+        <div class="field"><label for="f-year">Year completed</label><input id="f-year" name="year" type="number" min="1950" max="2100" value="${v("year")}" required><div class="err">Enter a year between 1950 and 2100.</div></div>
+        <div class="field"><label for="f-job">Current employment</label><input id="f-job" name="employment" value="${v("employment")}"><div class="hint">Leave blank if you are not working.</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>Section 3: Financial need</header>
+      <div class="body">
+        <div class="field"><label for="f-fund">How will you cover your tuition?</label>
+          ${sel("funding",["Self-funded","Family support","Employer sponsorship","Scholarship only"])}
+          <div class="err">Choose a funding source.</div></div>
+        <div class="field"><label for="f-stmt">Why do you need a scholarship?</label>
+          <textarea id="f-stmt" name="statement" required minlength="50">${v("statement")}</textarea>
+          <div class="hint">At least 50 characters. <span id="count">0</span> so far.</div>
+          <div class="err">Write at least 50 characters.</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>Section 4: Declaration</header>
+      <div class="body">
+        <div class="field check"><input type="checkbox" id="f-decl" name="declaration" ${a.declaration?"checked":""} required><label for="f-decl">I confirm that the information in this form is true and complete.</label></div>
+        <div class="err" id="declErr">Tick the box to confirm.</div>
+      </div>
+    </section>
+
+    <button class="btn primary block" type="submit">Save application</button>
+  </form>`;
+};
+views.application.after = () => {
+  const form = $("#appForm"), ta = $("#f-stmt"), cnt = $("#count");
+  const upd = () => cnt.textContent = ta.value.length; upd(); ta.oninput = upd;
+  form.onsubmit = async e => {
+    e.preventDefault();
+    let ok = true;
+    $$(".field", form).forEach(f => {
+      const inp = $("input:not([readonly]),select,textarea", f);
+      if (!inp || inp.type === "checkbox") return;
+      const bad = inp.required && !inp.checkValidity();
+      f.classList.toggle("invalid", bad); if (bad) ok = false;
+    });
+    const decl = $("#f-decl"); $("#declErr").style.display = decl.checked ? "none" : "block"; if (!decl.checked) ok = false;
+    const data = Object.fromEntries(new FormData(form)); data.declaration = decl.checked;
+    store.application = data;
+    const btn = $("button[type=submit]", form); btn.disabled = true;
+    const r = await authed("saveApplication", data);
+    btn.disabled = false;
+    if (!r.ok) { toast(r.error); return; }
+    CONFIG.checklist[1].done = true;
+    if (r.data && r.data.status) { S.status = r.data.status; renderProfile(); }
+    if (ok) { CONFIG.checklist[2].done = true; toast("Application saved."); }
+    else { toast("Saved as a draft. Fix the highlighted fields to complete it."); $(".invalid", form)?.scrollIntoView({block:"center"}); }
+  };
+};
+
+/* ---------- helpers ---------- */
+store.docs = [];
+store.preregs = []; store.enrols = []; store.payInfo = "";
+store.payMethods = ["Mobile money", "Bank transfer", "Cash deposit"];
+store.statuses = ["INQUIRY", "APPLIED", "UNDER REVIEW", "ACCEPTED", "REJECTED", "ENROLLED"];
+const ro = v => `<input value="${esc(v)}" readonly>`;
+const F = (label, control, err="This field is required.", hint="") =>
+  `<div class="field"><label>${label}${control}</label>${hint?`<div class="hint">${hint}</div>`:""}<div class="err">${err}</div></div>`;
+const empty = msg => `<div class="info">${msg}</div>`;
+const rating = name => `<fieldset class="field" style="border:0"><legend style="font-size:14px;font-weight:600;margin-bottom:6px">Rating (1 is poor, 5 is excellent)</legend><div class="row">${[1,2,3,4,5].map((n,i)=>`<label class="chip"><input type="radio" name="${name}" value="${n}" ${i===0?"required":""}>${n}</label>`).join("")}</div><div class="err">Choose a rating.</div></fieldset>`;
+function bindForm(id, onOk){
+  const f = $("#"+id); if (!f) return;
+  f.onsubmit = e => {
+    e.preventDefault(); let ok = true;
+    $$("[required]", f).forEach(el => { const bad = !el.checkValidity(); el.closest(".field").classList.toggle("invalid", bad); if (bad) ok = false; });
+    if (!ok) { toast("Fix the highlighted fields."); return; }
+    const btn = $("button[type=submit]", f); if (btn) btn.disabled = true;
+    Promise.resolve(onOk(Object.fromEntries(new FormData(f)), f)).finally(() => { if (btn) btn.disabled = false; });
+  };
+}
+const IC = {
+  file:'<svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/></svg>',
+  card:'<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/></svg>',
+  lock:'<svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  people:'<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20c0-3.5 2.7-5.5 6-5.5s6 2 6 5.5zm10 0c0-1.8-.5-3.2-1.4-4.2.4-.2.9-.3 1.4-.3 3.3 0 6 2 6 4.5z"/></svg>'
+};
+const footer = () => {
+  const c = CONFIG.contact;
+  return `<footer class="foot">
+    <p>You are logged in as <a href="#" data-go="account">${esc(S.name)}</a> (<a href="#" data-logout>Logout</a>)</p>
+    <h4>Important links</h4>
+    ${CONFIG.links.map(l=>`<a href="${esc(l.url)}">${esc(l.label)}</a>`).join("")}<a href="#" data-go="help">Help</a>
+    <h4>How to find us</h4>
+    ${c.website?`<div>${esc(c.website)}</div>`:""}${c.email?`<div><a href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>`:""}${c.phone?`<div>${esc(c.phone)}</div>`:""}${c.address?`<div>${esc(c.address)}</div>`:""}
+  </footer>`;
+};
+
+/* ---------- Account hub ---------- */
+views.account = () => `
+  <section class="hero">
+    <div class="hero-top"><h2>${esc(S.name)}</h2><div>${esc(S.id)}</div></div>
+    <div class="hero-photo">Image not available</div>
+    <div class="badges"><span class="badge">Application fee</span><span class="badge">Payment plan</span></div>
+    <div class="linklist">
+      <button data-go="documents">${IC.file}My documents</button>
+      <button data-go="pay">${IC.card}Make a payment</button>
+      <button data-go="password">${IC.lock}Change password</button>
+      <button data-go="nok">${IC.people}Next of kin info</button>
+    </div>
+  </section>
+  <section class="program"><span class="tag">Applied for:</span><h3>${esc(CONFIG.programme)}</h3></section>`;
+
+/* ---------- Student ---------- */
+views.profile = () => `
+  <h1>Profile</h1>
+  <section class="panel"><header>Personal details</header><div class="body">
+    <div class="field"><label>Full name${ro(S.name)}</label></div>
+    <div class="field"><label>Student ID${ro(S.id)}</label></div>
+    <div class="field"><label>Username${ro(S.username)}</label></div>
+    <div class="field"><label>Email${ro(S.email)}</label></div>
+  </div></section>
+  <form id="profileForm" class="panel" novalidate><header>Contact details</header><div class="body">
+    ${F("Phone", `<input name="phone" type="tel" value="${esc(S.phone)}">`)}
+    ${F("Country", `<input name="country" value="${esc(S.country)}">`)}
+    <button class="btn primary" type="submit">Save profile</button>
+  </div></form>`;
+views.profile.after = () => bindForm("profileForm", async d => {
+  const r = await authed("saveProfile", d);
+  if (!r.ok) { toast(r.error); return; }
+  S.phone = d.phone; S.country = d.country; toast("Profile saved.");
+});
+
+views.documents = () => `
+  <h1>Documents</h1>
+  <p class="lead">Upload the documents your application needs, such as ID and certificates.</p>
+  <section class="panel"><div class="body">
+    <div class="field"><label>Choose a file<input type="file" id="docFile"></label></div>
+    <button class="btn primary" id="docAdd" type="button">Upload document</button>
+  </div></section>
+  ${store.docs.length ? `<table><thead><tr><th>File</th><th>Size</th><th>Added</th></tr></thead><tbody>${store.docs.map(d=>`<tr><td>${esc(d.name)}</td><td>${d.size} KB</td><td>${esc(d.date)}</td></tr>`).join("")}</tbody></table>` : empty("No documents uploaded yet.")}`;
+views.documents.after = () => {
+  $("#docAdd").onclick = async () => {
+    const f = $("#docFile").files[0];
+    if (!f) { toast("Choose a file first."); return; }
+    if (f.size > 4*1024*1024) { toast("That file is over 4 MB. Choose a smaller one."); return; }
+    const btn = $("#docAdd"); btn.disabled = true;
+    try {
+      if (DEMO) {
+        store.docs.push({ name:f.name, size:Math.max(1,Math.round(f.size/1024)), date:new Date().toLocaleDateString() });
+      } else {
+        const b64 = await new Promise((res,rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
+        const r = await authed("uploadDocument", f.name, b64);
+        if (!r.ok) { toast(r.error); return; }
+        store.docs = r.data.documents;
+      }
+      go("documents"); toast("Document added.");
+    } catch(e) { toast("Couldn't read that file. Try again."); }
+    finally { btn.disabled = false; }
+  };
+};
+
+views.transcript = () => `<h1>Transcript</h1>${empty("No results yet. Your transcript appears here once grades are published.")}`;
+
+views.password = () => `
+  <h1>Change password</h1>
+  <form id="pwForm" class="panel" novalidate><div class="body">
+    ${F("Current password", `<input name="old" type="password" autocomplete="current-password" required>`, "Enter your current password.")}
+    ${F("New password", `<input name="new" type="password" autocomplete="new-password" minlength="8" required>`, "Use at least 8 characters.")}
+    ${F("Confirm new password", `<input name="conf" type="password" autocomplete="new-password" required>`, "Confirm your new password.")}
+    <button class="btn primary" type="submit">Change password</button>
+  </div></form>`;
+views.password.after = () => bindForm("pwForm", async (d,f) => {
+  if (d.new !== d.conf) { toast("The new passwords don't match."); return; }
+  const r = await authed("changePassword", d.old, d.new);
+  if (!r.ok) { toast(r.error); return; }
+  if (r.data && r.data.token) tokenStore.set(r.data.token);
+  f.reset(); toast("Password changed. You're still signed in here; other devices were signed out.");
+});
+
+views.nok = () => `
+  <h1>Next of kin</h1>
+  <form id="nokForm" class="panel" novalidate><div class="body">
+    ${F("Full name", `<input name="name" value="${esc(store.nok?.name)}" required>`)}
+    ${F("Relationship", `<input name="rel" value="${esc(store.nok?.rel)}" required>`)}
+    ${F("Phone", `<input name="phone" type="tel" value="${esc(store.nok?.phone)}" required>`)}
+    <button class="btn primary" type="submit">Save next of kin</button>
+  </div></form>`;
+views.nok.after = () => bindForm("nokForm", async d => {
+  const r = await authed("saveNok", d);
+  if (!r.ok) { toast(r.error); return; }
+  store.nok = d; toast("Next of kin saved.");
+});
+
+/* ---------- Finance ---------- */
+const pillFor = st => ({ Confirmed:"done", Approved:"done", Enrolled:"done", Completed:"done", Pending:"todo", Rejected:"bad", Withdrawn:"bad" }[st] || "todo");
+const loading = id => `<div id="${id}">${empty("Loading…")}</div>`;
+
+views.pay = () => `
+  <h1>Make payment</h1>
+  <p class="lead">Current balance: <b>${money(S.currentBalance)}</b></p>
+  ${store.payInfo ? `<div class="info" style="white-space:pre-line">${esc(store.payInfo)}</div>` : ""}
+  <form id="payForm" class="panel" novalidate><div class="body">
+    <p class="hint" style="margin-bottom:12px">Pay using the details above, then record your payment here. It counts toward your balance once we confirm it.</p>
+    ${F("Amount (USD)", `<input name="amount" type="number" min="0.01" step="0.01" required>`, "Enter an amount greater than 0.")}
+    ${F("Payment method", `<select name="method" required><option value="">Select…</option>${store.payMethods.map(m=>`<option>${esc(m)}</option>`).join("")}</select>`, "Choose a payment method.")}
+    ${F("Reference", `<input name="reference" maxlength="60" required>`, "Enter the transaction or receipt reference.", "For example, the mobile money transaction ID or the bank slip number.")}
+    ${F("Note (optional)", `<input name="note" maxlength="200">`)}
+    <button class="btn primary" type="submit">Record payment</button>
+  </div></form>`;
+views.pay.after = () => bindForm("payForm", async (d,f) => {
+  const r = await authed("submitPayment", d);
+  if (!r.ok) { toast(r.error); return; }
+  f.reset(); toast("Payment recorded. It shows as pending until we confirm it.");
+  go("statement");
+});
+
+views.statement = () => `<h1>Statement of account</h1>${loading("stmtBox")}`;
+views.statement.after = async () => {
+  const r = await authed("getStatement");
+  const box = $("#stmtBox"); if (!box) return;
+  if (!r.ok) { box.innerHTML = empty(esc(r.error)); return; }
+  const d = r.data || { rows:[], currentBalance:S.currentBalance, availableBalance:S.availableBalance };
+  S.currentBalance = d.currentBalance; S.availableBalance = d.availableBalance; renderProfile();
+  box.innerHTML = (d.rows.length
+    ? `<table><thead><tr><th>Date</th><th>Description</th><th>Charge</th><th>Paid</th><th>Status</th></tr></thead><tbody>${d.rows.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.description)}${x.reference?`<br><small>${esc(x.reference)}</small>`:""}</td><td>${x.type==="Charge"?money(x.amount):""}</td><td>${x.type==="Payment"?money(x.amount):""}</td><td><span class="pill ${pillFor(x.status)}">${esc(x.status)}</span></td></tr>`).join("")}</tbody></table>`
+    : empty("No transactions yet."))
+    + `<p class="lead" style="margin-top:14px">Current balance: <b>${money(d.currentBalance)}</b>. Available credit: <b>${money(d.availableBalance)}</b>.</p>`;
+};
+
+views.plan = () => `<h1>My payment plan</h1>${loading("planBox")}`;
+views.plan.after = async () => {
+  const r = await authed("getPlan");
+  const box = $("#planBox"); if (!box) return;
+  if (!r.ok) { box.innerHTML = empty(esc(r.error)); return; }
+  const rows = (r.data && r.data.rows) || [];
+  box.innerHTML = rows.length
+    ? `<table><thead><tr><th>Due date</th><th>Amount</th><th>Note</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.date)}</td><td>${money(x.amount)}</td><td>${esc(x.note)}</td></tr>`).join("")}</tbody></table>`
+    : empty("You don't have a payment plan yet.");
+};
+
+/* ---------- Modules, offers, pre-registration ---------- */
+const moduleTitle = code => { for (const g of CONFIG.moduleGroups) for (const m of g.items) if (m.code === code) return m.title; return code; };
+async function refreshModules(){
+  const r = await authed("getMyModules");
+  if (r.ok && r.data) { CONFIG.moduleGroups = r.data.modules; store.preregs = r.data.preregs; store.enrols = r.data.enrolments; }
+}
+
+views.modules = () => `
+  <h1>Modules</h1>
+  <div class="info">Tap Offers next to a module to see the intakes you can pre-register for. You need to pass the required number of modules each year.</div>
+  <div class="mtable">
+    <div class="mhead"><span>Module</span><span>Status</span><span>Offers</span></div>
+    ${CONFIG.moduleGroups.map(g=>`
+      <div class="mgroup">${esc(g.name)}${g.note?`<small>${esc(g.note)}</small>`:""}</div>
+      ${g.items.map(m=>`<div class="mrow"><div><a href="#" data-offers="${esc(m.code)}">${esc(m.title)}</a><small>(${esc(m.code)})</small></div><span class="status-pill ${m.status==="Enrolled"||m.status==="Completed"?"ok":m.status==="Pre-registered"?"wait":""}">${esc(m.status)}</span><button class="btn-offers" data-offers="${esc(m.code)}">Offers (${m.offers})</button></div>`).join("")}`).join("")}
+  </div>`;
+
+views.offers = () => `<h1>Offers</h1>${loading("offersBox")}`;
+views.offers.after = async () => {
+  const code = store.offerFor;
+  let d;
+  if (DEMO) d = { module:{ code, title:moduleTitle(code) }, offers:[{ offerId:"demo", intake:"January 2027", startDate:"2027-01-11", deadline:"", seatsLeft:null, full:false, mine:"" }] };
+  else {
+    const r = await authed("getOffers", code);
+    if (!$("#offersBox")) return;
+    if (!r.ok) { $("#offersBox").innerHTML = empty(esc(r.error)); return; }
+    d = r.data;
+  }
+  const box = $("#offersBox"); if (!box) return;
+  box.innerHTML = `<p class="lead"><b>${esc(d.module.title)}</b> (${esc(d.module.code)})</p>` + (d.offers.length
+    ? d.offers.map(o => `<div class="panel"><div class="body">
+        <b>${esc(o.intake)}</b>
+        <div class="hint">Starts ${esc(o.startDate || "to be confirmed")}${o.deadline ? `. Register by ${esc(o.deadline)}` : ""}${o.seatsLeft != null ? `. ${o.seatsLeft} seat${o.seatsLeft === 1 ? "" : "s"} left` : ""}.</div>
+        <div class="row-actions">${o.mine ? `<span class="pill ${pillFor(o.mine)}">${esc(o.mine)}</span>` : o.full ? `<span class="pill bad">Full</span>` : `<button class="btn primary" data-prereg="${esc(o.offerId)}">Pre-register</button>`}</div>
+      </div></div>`).join("")
+    : empty("No offers are open for this module right now."));
+  $$("[data-prereg]", box).forEach(btn => btn.onclick = async () => {
+    if (DEMO) { toast("Demo mode. Pre-registration is saved once this is deployed."); return; }
+    btn.disabled = true;
+    const r = await authed("preRegister", btn.dataset.prereg);
+    if (!r.ok) { btn.disabled = false; toast(r.error); return; }
+    await refreshModules(); toast("Pre-registered. We'll confirm your place."); go("prereg");
+  });
+};
+
+views.prereg = () => `<h1>My pre-registrations</h1>` + (store.preregs.length
+  ? `<table><thead><tr><th>Module</th><th>Intake</th><th>Status</th><th></th></tr></thead><tbody>${store.preregs.map(r=>`<tr><td>${esc(r.title)}<br><small>${esc(r.code)}</small></td><td>${esc(r.intake)}</td><td><span class="pill ${pillFor(r.status)}">${esc(r.status)}</span></td><td>${r.status==="Pending"?`<button class="btn ghost" data-withdraw="${esc(r.id)}">Withdraw</button>`:""}</td></tr>`).join("")}</tbody></table>`
+  : empty("You haven't pre-registered for any modules yet. Choose an offer on the Modules page."));
+views.prereg.after = () => $$("[data-withdraw]").forEach(btn => btn.onclick = async () => {
+  btn.disabled = true;
+  const r = await authed("withdrawPrereg", btn.dataset.withdraw);
+  if (!r.ok) { btn.disabled = false; toast(r.error); return; }
+  await refreshModules(); toast("Pre-registration withdrawn."); go("prereg");
+});
+
+views.enrol = () => `<h1>My enrolments</h1>` + (store.enrols.length
+  ? `<table><thead><tr><th>Module</th><th>Intake</th><th>Status</th><th>Since</th></tr></thead><tbody>${store.enrols.map(r=>`<tr><td>${esc(r.title)}<br><small>${esc(r.code)}</small></td><td>${esc(r.intake)}</td><td><span class="pill ${pillFor(r.status)}">${esc(r.status)}</span></td><td>${esc(r.date)}</td></tr>`).join("")}</tbody></table>`
+  : empty("You aren't enrolled on any modules yet."));
+
+/* ---------- Staff pages (the server re-checks staff access on every call) ---------- */
+const staffOnly = html => S.admin ? html : `<h1>Not available</h1>${empty("This page is for staff.")}`;
+const dl = (k,v) => `<dt>${esc(k)}</dt><dd>${esc(v || "Not provided")}</dd>`;
+
+views.adminApps = () => staffOnly(`<h1>Applications</h1>
+  <div class="field"><label>Show<select id="appFilter"><option value="">All statuses</option>${store.statuses.map(x=>`<option>${esc(x)}</option>`).join("")}</select></label></div>
+  ${loading("adminBox")}`);
+views.adminApps.after = async () => {
+  if (!S.admin) return;
+  const r = await authed("adminListApplications");
+  const b = $("#adminBox"); if (!b) return;
+  if (!r.ok) { b.innerHTML = empty(esc(r.error)); return; }
+  const all = r.data.students;
+  const draw = () => {
+    const f = $("#appFilter").value;
+    const list = all.filter(x => !f || x.status === f);
+    b.innerHTML = list.length ? list.map(x => `<button class="arow" data-student="${esc(x.id)}"><span><b>${esc(x.name)}</b><small>${esc(x.id)}, ${esc(x.programme)}${x.complete ? ", application complete" : ""}</small></span><span class="pill ${pillFor(x.status==="ACCEPTED"||x.status==="ENROLLED"?"Approved":x.status==="REJECTED"?"Rejected":"Pending")}">${esc(x.status)}</span></button>`).join("") : empty("No students match.");
+    $$("[data-student]", b).forEach(el => el.onclick = () => { store.adminStudent = el.dataset.student; go("adminStudent"); });
+  };
+  $("#appFilter").onchange = draw; draw();
+};
+
+views.adminStudent = () => staffOnly(`<h1>Student</h1>${loading("adminBox")}`);
+views.adminStudent.after = async () => {
+  if (!S.admin) return;
+  const r = await authed("adminGetStudent", store.adminStudent);
+  const b = $("#adminBox"); if (!b) return;
+  if (!r.ok) { b.innerHTML = empty(esc(r.error)); return; }
+  const d = r.data, st = d.student, a = d.application, n = d.nok;
+  b.innerHTML = `
+    <section class="panel"><header>${esc(st.name)}</header><div class="body"><dl class="dl">${dl("Student ID",st.id)}${dl("Status",st.status)}${dl("Email",st.email)}${dl("Phone",st.phone)}${dl("Country",st.country)}${dl("Programme",st.programme)}${dl("Balance owed",money(st.currentBalance))}</dl></div></section>
+    <section class="panel"><header>Application</header><div class="body">${a ? `<dl class="dl">${dl("Complete",a.complete?"Yes":"No")}${dl("Highest qualification",a.level)}${dl("Institution",a.institution)}${dl("Year completed",a.year)}${dl("Employment",a.employment)}${dl("Funding",a.funding)}${dl("Statement",a.statement)}</dl>` : "No application saved yet."}</div></section>
+    <section class="panel"><header>Next of kin</header><div class="body">${n ? `<dl class="dl">${dl("Name",n.name)}${dl("Relationship",n.rel)}${dl("Phone",n.phone)}</dl>` : "Not provided."}</div></section>
+    <section class="panel"><header>Documents</header><div class="body">${d.documents.length ? d.documents.map(x => /^[\w-]+$/.test(x.fileId) ? `<div style="margin-bottom:8px"><a href="https://drive.google.com/file/d/${x.fileId}/view" target="_blank" rel="noopener">${esc(x.name)}</a><br><small>${x.size} KB, ${esc(x.date)}</small></div>` : "").join("") : "No documents."}</div></section>
+    <form id="statusForm" class="panel" novalidate><header>Decision</header><div class="body">
+      ${F("Status", `<select name="status" required>${store.statuses.map(x=>`<option ${x===st.status?"selected":""}>${esc(x)}</option>`).join("")}</select>`)}
+      <div class="row-actions"><button class="btn primary" type="submit">Update status</button><button class="btn ghost" type="button" id="goLedger">Record charge or payment</button></div>
+    </div></form>`;
+  bindForm("statusForm", async v => {
+    const u = await authed("adminSetStatus", st.id, v.status);
+    if (!u.ok) { toast(u.error); return; }
+    toast("Status updated.");
+  });
+  $("#goLedger").onclick = () => { store.prefillId = st.id; go("adminPay"); };
+};
+
+views.adminPay = () => staffOnly(`<h1>Payments</h1>
+  <h2 class="sub-h">Waiting for confirmation</h2>${loading("payBox")}
+  <h2 class="sub-h">Record a charge or payment</h2>
+  <form id="ledgerForm" class="panel" novalidate><div class="body">
+    ${F("Student ID", `<input name="studentId" value="${esc(store.prefillId || "")}" required>`, "Enter a student ID.")}
+    ${F("Type", `<select name="type" required><option value="">Select…</option><option>Charge</option><option>Payment</option></select>`, "Choose a type.", "A charge adds to what the student owes. A payment records money received.")}
+    ${F("Description", `<input name="description" maxlength="200" required>`, "Add a short description.")}
+    ${F("Amount (USD)", `<input name="amount" type="number" min="0.01" step="0.01" required>`, "Enter an amount greater than 0.")}
+    <button class="btn primary" type="submit">Save entry</button>
+  </div></form>`);
+views.adminPay.after = async () => {
+  if (!S.admin) return;
+  const load = async () => {
+    const r = await authed("adminListPayments");
+    const b = $("#payBox"); if (!b) return;
+    if (!r.ok) { b.innerHTML = empty(esc(r.error)); return; }
+    const list = r.data.payments;
+    b.innerHTML = list.length ? list.map(x => `<div class="panel"><div class="body">
+      <b>${money(x.amount)}</b> from ${esc(x.name)}
+      <div class="hint">${esc(x.studentId)}. ${esc(x.method)}, reference ${esc(x.reference)}. Recorded ${esc(x.date)}.${x.description ? ` ${esc(x.description)}` : ""}</div>
+      <div class="row-actions"><button class="btn primary" data-txn="${esc(x.txnId)}" data-dec="Confirmed">Confirm</button><button class="btn ghost" data-txn="${esc(x.txnId)}" data-dec="Rejected">Reject</button></div>
+    </div></div>`).join("") : empty("No payments are waiting.");
+    $$("[data-txn]", b).forEach(btn => btn.onclick = async () => {
+      btn.disabled = true;
+      const u = await authed("adminReviewPayment", btn.dataset.txn, btn.dataset.dec);
+      if (!u.ok) { btn.disabled = false; toast(u.error); return; }
+      toast(btn.dataset.dec === "Confirmed" ? "Payment confirmed." : "Payment rejected."); load();
+    });
+  };
+  load();
+  bindForm("ledgerForm", async (d,f) => {
+    const u = await authed("adminAddLedger", d);
+    if (!u.ok) { toast(u.error); return; }
+    store.prefillId = null; f.reset(); toast("Entry saved.");
+  });
+};
+
+views.adminPrereg = () => staffOnly(`<h1>Pre-registrations</h1>${loading("regBox")}`);
+views.adminPrereg.after = async () => {
+  if (!S.admin) return;
+  const load = async () => {
+    const r = await authed("adminListPreregs");
+    const b = $("#regBox"); if (!b) return;
+    if (!r.ok) { b.innerHTML = empty(esc(r.error)); return; }
+    const list = r.data.preregs;
+    b.innerHTML = list.length ? list.map(x => `<div class="panel"><div class="body">
+      <b>${esc(x.title)}</b> (${esc(x.code)})
+      <div class="hint">${esc(x.name)}, ${esc(x.studentId)}. ${esc(x.intake)}. Requested ${esc(x.date)}.</div>
+      <div class="row-actions"><button class="btn primary" data-reg="${esc(x.id)}" data-dec="Approved">Approve</button><button class="btn ghost" data-reg="${esc(x.id)}" data-dec="Rejected">Reject</button></div>
+    </div></div>`).join("") : empty("No pre-registrations are waiting.");
+    $$("[data-reg]", b).forEach(btn => btn.onclick = async () => {
+      btn.disabled = true;
+      const u = await authed("adminReviewPrereg", btn.dataset.reg, btn.dataset.dec);
+      if (!u.ok) { btn.disabled = false; toast(u.error); return; }
+      toast(btn.dataset.dec === "Approved" ? "Approved. The student is now enrolled." : "Pre-registration rejected."); load();
+    });
+  };
+  load();
+};
+
+/* ---------- Feedback ---------- */
+const allModules = () => CONFIG.moduleGroups.flatMap(g => g.items);
+views.suggestions = () => `
+  <h1>Suggestions</h1>
+  <form id="sugForm" class="panel" novalidate><div class="body">
+    ${F("Your suggestion", `<textarea name="text" required></textarea>`, "Write your suggestion.")}
+    <button class="btn primary" type="submit">Send suggestion</button>
+  </div></form>`;
+views.suggestions.after = () => bindForm("sugForm", async (d,f) => {
+  const r = await authed("submitFeedback", "suggestion", "", "", d.text);
+  if (!r.ok) { toast(r.error); return; }
+  f.reset(); toast("Suggestion sent.");
+});
+
+views.modeval = () => `
+  <h1>Module evaluation</h1>
+  <form id="modForm" class="panel" novalidate><div class="body">
+    ${F("Module", `<select name="module" required><option value="">Select…</option>${allModules().map(m=>`<option>${esc(m.title)} (${esc(m.code)})</option>`).join("")}</select>`, "Choose a module.")}
+    ${rating("rate")}
+    ${F("Comments", `<textarea name="text"></textarea>`)}
+    <button class="btn primary" type="submit">Send evaluation</button>
+  </div></form>`;
+views.modeval.after = () => bindForm("modForm", async (d,f) => {
+  const r = await authed("submitFeedback", "module", d.module, d.rate, d.text);
+  if (!r.ok) { toast(r.error); return; }
+  f.reset(); toast("Evaluation sent.");
+});
+
+views.syseval = () => `
+  <h1>System evaluation</h1>
+  <form id="sysForm" class="panel" novalidate><div class="body">
+    ${rating("rate")}
+    ${F("What would make this portal easier to use?", `<textarea name="text"></textarea>`)}
+    <button class="btn primary" type="submit">Send evaluation</button>
+  </div></form>`;
+views.syseval.after = () => bindForm("sysForm", async (d,f) => {
+  const r = await authed("submitFeedback", "system", "", d.rate, d.text);
+  if (!r.ok) { toast(r.error); return; }
+  f.reset(); toast("Evaluation sent.");
+});
+
+/* ---------- Other ---------- */
+views.help = () => `
+  <h1>Help</h1>
+  <p class="lead">Need a hand? Email <a href="mailto:${esc(CONFIG.supportEmail)}">${esc(CONFIG.supportEmail)}</a> and include your student ID (${esc(S.id)}).</p>
+  <details class="step"><summary>How do I save my application?</summary><div class="inner">Tap Save application at the bottom of the form. Changes aren't kept until you do.</div></details>
+  <details class="step"><summary>How do I change my details?</summary><div class="inner">Open Student, then Profile. For locked fields, email support.</div></details>
+  <details class="step"><summary>How do I choose modules?</summary><div class="inner">Open Modules, then tap Offers next to a module to see the available intakes.</div></details>`;
+views.notifications = () => `<h1>Notifications</h1>${empty("You have no new notifications.")}`;
+
+/* ---------- sign in / create account ---------- */
+async function showAuth(msg){
+  document.body.classList.add("auth"); closeDrawer(); window.scrollTo(0,0); S.admin = false; $("#adminNav").classList.add("hidden");
+  let programmes = [];
+  const pc = await api("getPublicConfig");
+  if (pc.ok && pc.data) programmes = pc.data.programmes;
+  $("#view").innerHTML = `<div class="auth-card">
+    <div class="brand">${esc(CONFIG.schoolName)}<small>${esc(CONFIG.tagline)}</small></div>
+    <h1 id="authTitle">Sign in</h1>
+    ${msg ? `<div class="info">${esc(msg)}</div>` : ""}
+    <form id="loginForm" class="panel" novalidate><div class="body">
+      ${F("Username", `<input name="username" autocomplete="username" required>`, "Enter your username.")}
+      ${F("Password", `<input name="password" type="password" autocomplete="current-password" required>`, "Enter your password.")}
+      <button class="btn primary block" type="submit">Sign in</button>
+    </div></form>
+    <form id="regForm" class="panel hidden" novalidate><div class="body">
+      ${F("Full name", `<input name="name" autocomplete="name" required>`, "Enter your full name.")}
+      ${F("Email", `<input name="email" type="email" autocomplete="email" required>`, "Enter a valid email address.")}
+      ${F("Username", `<input name="username" autocomplete="username" pattern="[A-Za-z0-9._\\-]{3,30}" required>`, "Use 3 to 30 letters, numbers, dots, dashes or underscores.")}
+      ${F("Programme", `<select name="programme" required><option value="">Select…</option>${programmes.map(p=>`<option>${esc(p)}</option>`).join("")}</select>`, "Choose a programme.")}
+      ${F("Password", `<input name="password" type="password" autocomplete="new-password" minlength="8" required>`, "Use at least 8 characters.")}
+      ${F("Confirm password", `<input name="conf" type="password" autocomplete="new-password" required>`, "Confirm your password.")}
+      <button class="btn primary block" type="submit">Create account</button>
+    </div></form>
+    <form id="reqForm" class="panel hidden" novalidate><div class="body">
+      <p class="hint" style="margin-bottom:12px">Enter your username or email. If an account matches, we'll email you a 6-digit code.</p>
+      ${F("Username or email", `<input name="identifier" autocomplete="username" required>`, "Enter your username or email.")}
+      <button class="btn primary block" type="submit">Email me a code</button>
+    </div></form>
+    <form id="resetForm" class="panel hidden" novalidate><div class="body">
+      <p class="hint" style="margin-bottom:12px">Check your email for the code. It works for 30 minutes.</p>
+      ${F("6-digit code", `<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>`, "Enter the 6-digit code from the email.")}
+      ${F("New password", `<input name="password" type="password" autocomplete="new-password" minlength="8" required>`, "Use at least 8 characters.")}
+      ${F("Confirm new password", `<input name="conf" type="password" autocomplete="new-password" required>`, "Confirm your new password.")}
+      <button class="btn primary block" type="submit">Set new password</button>
+    </div></form>
+    <form id="verifyForm" class="panel hidden" novalidate><div class="body">
+      <p class="hint" style="margin-bottom:12px">We emailed a 6-digit code to the address you signed up with. Enter it to finish creating your account.</p>
+      ${F("6-digit code", `<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>`, "Enter the 6-digit code from the email.")}
+      <button class="btn primary block" type="submit">Verify email</button>
+      <button class="btn ghost block" type="button" id="resendBtn" style="margin-top:10px">Send a new code</button>
+    </div></form>
+    <p><a href="#" id="authSwap">Create an account</a></p>
+    <p id="forgotP"><a href="#" id="forgotLink">Forgot your password?</a></p>
+  </div>`;
+  let pane = "login", resetId = "", verifyId = "", pendingPw = "";
+  const titles = { login:"Sign in", reg:"Create account", req:"Reset password", reset:"Choose a new password", verify:"Verify your email" };
+  const show = k => {
+    pane = k;
+    ["login","reg","req","reset","verify"].forEach(n => $("#" + n + "Form").classList.toggle("hidden", n !== k));
+    $("#authTitle").textContent = titles[k];
+    $("#authSwap").textContent = k === "login" ? "Create an account" : "Back to sign in";
+    $("#forgotP").classList.toggle("hidden", k !== "login");
+  };
+  $("#authSwap").onclick = () => show(pane === "login" ? "reg" : "login");
+  $("#forgotLink").onclick = () => show("req");
+  bindForm("reqForm", async d => {
+    const r = await api("requestReset", d.identifier);
+    if (!r.ok) { toast(r.error); return; }
+    resetId = d.identifier; toast("If an account matches, we've emailed a code."); show("reset");
+  });
+  bindForm("resetForm", async (d,f) => {
+    if (d.password !== d.conf) { toast("The passwords don't match."); return; }
+    const r = await api("resetPassword", resetId, d.code, d.password);
+    if (!r.ok) { toast(r.error); return; }
+    f.reset(); show("login"); toast("Password changed. Sign in with your new password.");
+  });
+  bindForm("verifyForm", async (d,f) => {
+    const r = await api("verifyEmail", verifyId, d.code);
+    if (!r.ok) { toast(r.error); return; }
+    if (pendingPw) {
+      const l = await api("login", verifyId, pendingPw); pendingPw = "";
+      if (l.ok) { tokenStore.set(l.data.token); await boot(); return; }
+    }
+    f.reset(); show("login"); toast("Email verified. Sign in.");
+  });
+  $("#resendBtn").onclick = async () => {
+    const r = await api("resendVerification", verifyId);
+    toast(r.ok ? "If that account is waiting for verification, we've sent a new code." : r.error);
+  };
+  bindForm("loginForm", async d => {
+    const r = await api("login", d.username, d.password);
+    if (!r.ok && r.code === "VERIFY") { verifyId = d.username; pendingPw = d.password; show("verify"); toast(r.error); return; }
+    if (!r.ok) { toast(r.error); return; }
+    tokenStore.set(r.data.token); await boot();
+  });
+  bindForm("regForm", async d => {
+    if (d.password !== d.conf) { toast("The passwords don't match."); return; }
+    const r = await api("register", { name:d.name, email:d.email, username:d.username, programme:d.programme, password:d.password });
+    if (!r.ok) { toast(r.error); return; }
+    if (r.data && r.data.verify) {
+      verifyId = d.username; pendingPw = d.password; show("verify");
+      toast(r.data.emailed ? "We emailed you a 6-digit code." : "Verification emails are busy. Tap Send a new code in a little while.");
+      return;
+    }
+    const l = await api("login", d.username, d.password);
+    if (!l.ok) { toast(l.error); return; }
+    tokenStore.set(l.data.token); await boot();
+  });
+}
+
+async function boot(){
+  if (DEMO) { document.body.classList.remove("auth"); go("home"); return; }
+  const t = tokenStore.get();
+  if (!t) { showAuth(); return; }
+  const r = await api("bootstrap", t);
+  if (!r.ok) { tokenStore.set(null); showAuth(r.code === "SESSION" ? "" : r.error); return; }
+  const d = r.data;
+  Object.assign(S, d.student);
+  CONFIG.programme = d.student.programme;
+  store.application = d.application || {};
+  store.nok = d.nok || null;
+  store.docs = d.documents || [];
+  if (d.modules && d.modules.length) CONFIG.moduleGroups = d.modules;
+  store.preregs = d.preregs || []; store.enrols = d.enrolments || [];
+  store.payInfo = d.payInfo || ""; store.payMethods = d.payMethods || store.payMethods; store.statuses = d.statuses || store.statuses;
+  $("#adminNav").classList.toggle("hidden", !S.admin);
+  CONFIG.checklist[1].done = !!d.application;
+  CONFIG.checklist[2].done = !!(d.application && d.application.complete);
+  renderProfile();
+  document.body.classList.remove("auth");
+  go("home");
+}
+boot();
+</script>
+</body>
+</html>
