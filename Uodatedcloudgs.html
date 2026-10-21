@@ -1,0 +1,260 @@
+/** Adullam Bible School portal - Google Apps Script backend (Sheets = database)
+ *  1) Open a Google Sheet > Extensions > Apps Script. Paste this as Code.gs, add Index.html.
+ *  2) Edit the values in setup(), run setup() once, authorize.
+ *  3) Deploy > New deployment > Web app > Execute as: Me, Access: Anyone.
+ */
+const COLS = {
+  Students: ['ID','Name','Email','Phone','Church','Testimony','Status','Hash','Salt','Created'],
+  Lectures: ['Week','Title','Date','Video','Audio','Handout','Quiz','Deadline'],
+  Scores:   ['ID','Week','Score','Date'],
+  Payments: ['Ref','ID','Name','Amount','Purpose','Status','Date'],
+  Feedback: ['Time','ID','Name','Subject','Message','Reply','Replied'],
+  Notices:  ['Date','Title','Body'],
+  Attendance: ['ID','Week','Date']
+};
+
+function setup() {
+  const ss = SpreadsheetApp.getActive();
+  Object.keys(COLS).forEach(n => {
+    const s = ss.getSheetByName(n) || ss.insertSheet(n);
+    if (!s.getLastRow()) {
+      s.appendRow(COLS[n]); s.setFrozenRows(1);
+      s.getRange(1, 1, 1, COLS[n].length).setFontWeight('bold');
+    }
+  });
+  // EDIT THESE, run once, then you may blank the values here.
+  PropertiesService.getScriptProperties().setProperties({
+    ADMIN_EMAIL: 'you@example.com', ADMIN_PIN: '123456',
+    PAYSTACK_PUBLIC: 'pk_test_xxx', PAYSTACK_SECRET: 'sk_test_xxx',
+    FEE_NGN: '10000', CAMPUS: 'Adullam Bible School'
+  });
+}
+
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('Bible School Portal')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+const props = () => PropertiesService.getScriptProperties().getProperties();
+const sh = n => { // auto-creates a missing tab, so upgrades need no re-setup
+  const ss = SpreadsheetApp.getActive(); let s = ss.getSheetByName(n);
+  if (!s) { s = ss.insertSheet(n); s.appendRow(COLS[n]); s.setFrozenRows(1); }
+  return s;
+};
+const today = () => Utilities.formatDate(new Date(), 'Africa/Lagos', 'yyyy-MM-dd');
+function rows(n) {
+  const v = sh(n).getDataRange().getValues(), h = v.shift();
+  return v.map((r, i) => {
+    const o = { _r: i + 2 };
+    h.forEach((k, j) => o[k] = r[j] instanceof Date ? Utilities.formatDate(r[j], 'Africa/Lagos', 'yyyy-MM-dd') : r[j]);
+    return o;
+  });
+}
+const clean = r => { const o = Object.assign({}, r); delete o.Hash; delete o.Salt; return o; };
+function hash(pin, salt) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + pin)
+    .map(b => ('0' + (b & 255).toString(16)).slice(-2)).join('');
+}
+function tok(s) {
+  const t = Utilities.getUuid();
+  CacheService.getScriptCache().put(t, JSON.stringify(s), 21600);
+  return { token: t, role: s.role, name: s.name };
+}
+function sess(t) {
+  const c = CacheService.getScriptCache().get(t || 'x');
+  if (!c) throw 'Session expired. Sign in again.';
+  return JSON.parse(c);
+}
+const adm = s => { if (s.role !== 'Admin') throw 'Not allowed.'; };
+function mail(to, subject, body) {
+  try { MailApp.sendEmail(to, subject, body); } catch (e) { console.error(e); }
+}
+
+/** Single entry point called from the browser */
+function api(a, t, p) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+    if (!A[a]) throw 'Unknown action.';
+    const open = a === 'register' || a === 'login';
+    return { ok: true, data: A[a](p || {}, open ? null : sess(t)) };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e) };
+  } finally { try { lock.releaseLock(); } catch (x) {} }
+}
+
+const A = {
+  /* ---------- public ---------- */
+  register(p) {
+    const e = String(p.email || '').trim().toLowerCase(), n = String(p.name || '').trim();
+    if (!n || !/^\S+@\S+\.\S+$/.test(e)) throw 'Enter your full name and a valid email.';
+    if (!/^\d{4,6}$/.test(p.pin || '')) throw 'Choose a PIN of 4 to 6 digits.';
+    if (!p.covenant) throw 'You must accept the covenant to apply.';
+    if (rows('Students').some(r => String(r.Email).toLowerCase() === e)) throw 'This email is already registered.';
+    const salt = Utilities.getUuid();
+    sh('Students').appendRow(['', n, e, "'" + (p.phone || ''), p.church || '', p.testimony || '', 'Pending', hash(p.pin, salt), salt, today()]);
+    mail(props().ADMIN_EMAIL, 'New application: ' + n, n + ' has applied. Open the portal > Review to approve.');
+    return 'Application received. You will get your Student ID by email once approved.';
+  },
+  login(p) {
+    const e = String(p.email || '').trim().toLowerCase(), P = props();
+    const cache = CacheService.getScriptCache(), k = 'fail' + e, fails = +cache.get(k) || 0;
+    if (fails >= 5) throw 'Too many wrong attempts. Try again in 15 minutes.';
+    if (e === String(P.ADMIN_EMAIL).toLowerCase() && String(p.pin) === String(P.ADMIN_PIN)) {
+      cache.remove(k);
+      return tok({ id: 'ADMIN', role: 'Admin', name: 'Administrator' });
+    }
+    const r = rows('Students').find(x => String(x.Email).toLowerCase() === e);
+    if (!r || hash(String(p.pin), r.Salt) !== r.Hash) { cache.put(k, fails + 1, 900); throw 'Email or PIN is incorrect.'; }
+    cache.remove(k);
+    if (r.Status === 'Pending') throw 'Your application is still under review.';
+    if (r.Status === 'Denied') throw 'This application was not approved. Contact the office.';
+    return tok({ id: r.ID, role: 'Student', name: r.Name });
+  },
+
+  /* ---------- student ---------- */
+  home(p, s) {
+    const sc = rows('Scores').filter(x => x.ID === s.id);
+    const avg = sc.length ? Math.round(sc.reduce((a, b) => a + Number(b.Score), 0) / sc.length) : null;
+    return {
+      name: s.name, id: s.id, avg, quizzes: sc.length,
+      watched: rows('Attendance').filter(x => x.ID === s.id).length, total: rows('Lectures').length,
+      paid: rows('Payments').some(x => x.ID === s.id && x.Status === 'success'),
+      fee: +props().FEE_NGN, notices: rows('Notices').reverse().slice(0, 5)
+    };
+  },
+  lectures(p, s) {
+    const w = rows('Attendance').filter(x => x.ID === s.id).map(x => String(x.Week));
+    return rows('Lectures').reverse().map(l => Object.assign(l, { Watched: w.includes(String(l.Week)) }));
+  },
+  watch(p, s) { // replaces the Facebook attendance-comment gate
+    if (!rows('Attendance').some(x => x.ID === s.id && String(x.Week) === String(p.week)))
+      sh('Attendance').appendRow([s.id, p.week, today()]);
+    return 'Marked as watched.';
+  },
+  scores(p, s) { return rows('Scores').filter(x => x.ID === s.id); },
+  send(p, s) {
+    if (!p.message) throw 'Write a message first.';
+    sh('Feedback').appendRow([new Date(), s.id, s.name, p.subject || 'General', p.message, '', '']);
+    mail(props().ADMIN_EMAIL, 'Student message: ' + (p.subject || 'General'), s.name + ' (' + s.id + '): ' + p.message);
+    return 'Message sent.';
+  },
+  mine(p, s) { return rows('Feedback').filter(x => x.ID === s.id).reverse(); },
+  payInit(p, s) {
+    const P = props(), me = rows('Students').find(x => x.ID === s.id);
+    return { key: P.PAYSTACK_PUBLIC, email: me.Email, amount: +P.FEE_NGN, sid: s.id, ref: 'ADL' + Date.now() };
+  },
+  payVerify(p, s) {
+    const P = props();
+    if (rows('Payments').some(x => x.Ref === p.ref)) return 'Already recorded.';
+    const res = UrlFetchApp.fetch('https://api.paystack.co/transaction/verify/' + encodeURIComponent(p.ref),
+      { headers: { Authorization: 'Bearer ' + P.PAYSTACK_SECRET }, muteHttpExceptions: true });
+    const d = JSON.parse(res.getContentText()).data || {};
+    if (d.status !== 'success' || d.amount < +P.FEE_NGN * 100) throw 'Payment could not be confirmed.';
+    sh('Payments').appendRow([p.ref, s.id, s.name, d.amount / 100, 'Graduation pack', 'success', today()]);
+    return 'Paid';
+  },
+
+  /* ---------- admin ---------- */
+  admin(p, s) {
+    adm(s);
+    return {
+      students: rows('Students').map(clean), lectures: rows('Lectures'),
+      scores: rows('Scores'), payments: rows('Payments'), feedback: rows('Feedback').reverse(),
+      attendance: rows('Attendance')
+    };
+  },
+  approve(p, s) {
+    adm(s);
+    const all = rows('Students'), me = all.find(x => x._r === p.r);
+    const n = all.map(x => +String(x.ID).split('-')[2] || 0);
+    const id = 'ADL-26-' + String(Math.max(0, ...n) + 1).padStart(3, '0');
+    sh('Students').getRange(p.r, 1).setValue(id);
+    sh('Students').getRange(p.r, 7).setValue('Approved');
+    mail(me.Email, 'Welcome - your Student ID',
+      'Dear ' + me.Name + ',\n\nYou are admitted. Student ID: ' + id + '\nSign in with your email and PIN: ' + ScriptApp.getService().getUrl());
+    return id;
+  },
+  deny(p, s) { adm(s); sh('Students').getRange(p.r, 7).setValue('Denied'); return 'Denied'; },
+  saveScores(p, s) {
+    adm(s);
+    const have = rows('Scores');
+    p.list.forEach(x => {
+      if (x.score === '' || x.score == null) return;
+      const m = have.find(h => h.ID === x.id && String(h.Week) === String(p.week));
+      if (m) sh('Scores').getRange(m._r, 3).setValue(+x.score);
+      else sh('Scores').appendRow([x.id, p.week, +x.score, today()]);
+    });
+    return 'Scores saved.';
+  },
+  saveLecture(p, s) {
+    adm(s);
+    sh('Lectures').appendRow([p.week, p.title, p.date, p.video, p.audio, p.handout, p.quiz, p.deadline]);
+    return 'Lecture published.';
+  },
+  notice(p, s) { adm(s); sh('Notices').appendRow([today(), p.title, p.body]); return 'Notice posted.'; },
+  resetPin(p, s) {
+    adm(s);
+    const st = rows('Students').find(x => x._r === p.r);
+    if (!st || st.Status !== 'Approved') throw 'Student is not approved.';
+    const pin = String(Math.floor(100000 + Math.random() * 900000)), salt = Utilities.getUuid();
+    sh('Students').getRange(p.r, 8, 1, 2).setValues([[hash(pin, salt), salt]]);
+    mail(st.Email, 'Your temporary PIN', 'Dear ' + st.Name + ',\n\nYour temporary PIN is ' + pin + '.\nSign in: ' + ScriptApp.getService().getUrl());
+    return 'Temporary PIN emailed to ' + st.Email;
+  },
+  resend(p, s) {
+    adm(s);
+    const st = rows('Students').find(x => x._r === p.r);
+    if (!st || st.Status !== 'Approved') throw 'Student is not approved.';
+    mail(st.Email, 'Your Student ID', 'Dear ' + st.Name + ',\n\nYour Student ID is ' + st.ID + '.\nSign in: ' + ScriptApp.getService().getUrl());
+    return 'ID emailed to ' + st.Email;
+  },
+  certificate(p, s) {
+    adm(s);
+    const st = rows('Students').find(x => x._r === p.r);
+    if (!st || st.Status !== 'Approved') throw 'Student is not approved.';
+    const sc = rows('Scores').filter(x => x.ID === st.ID);
+    const avg = sc.length ? Math.round(sc.reduce((a, b) => a + Number(b.Score), 0) / sc.length) : 0;
+    if (!rows('Payments').some(x => x.ID === st.ID && x.Status === 'success')) throw 'Graduation fee not paid yet.';
+    if (avg < 60) throw 'Cumulative average is ' + avg + '%, below the 60% pass line.';
+    const campus = props().CAMPUS || 'Bible School';
+    const html = '<div style="border:8px double #B7791F;padding:60px 40px;text-align:center;font-family:Georgia,serif;color:#1B2A41">' +
+      '<h1 style="font-size:34px;margin:0">' + campus + '</h1>' +
+      '<p style="font-size:18px;margin-top:30px">This certifies that</p>' +
+      '<h2 style="font-size:40px;margin:16px 0">' + st.Name + '</h2>' +
+      '<p style="font-size:18px">Student ID ' + st.ID + '</p>' +
+      '<p style="font-size:18px;margin-top:24px">has completed the full course of study with a cumulative average of ' + avg + '%.</p>' +
+      '<p style="font-size:16px;margin-top:50px">Awarded ' + today() + '</p>' +
+      '<p style="margin-top:50px;font-size:16px">______________________<br>Visionary Director</p></div>';
+    const pdf = Utilities.newBlob(html, 'text/html', 'c.html').getAs('application/pdf').setName('Certificate-' + st.ID + '.pdf');
+    DriveApp.createFile(pdf); // archive copy in your Drive
+    MailApp.sendEmail({ to: st.Email, subject: 'Your certificate of completion',
+      body: 'Congratulations ' + st.Name + '! Your certificate is attached.', attachments: [pdf] });
+    return 'Certificate emailed to ' + st.Email;
+  },
+  reply(p, s) {
+    adm(s);
+    const f = rows('Feedback').find(x => x._r === p.r);
+    sh('Feedback').getRange(p.r, 6, 1, 2).setValues([[p.text, today()]]);
+    const st = rows('Students').find(x => x.ID === f.ID);
+    if (st) mail(st.Email, 'Reply from the school office', p.text);
+    return 'Reply sent.';
+  }
+};
+
+/** Triggers (Edit > Triggers): replace the manual Wednesday/Thursday/Friday admin chores */
+function warnLowScorers() { // weekly, Thursday
+  const sc = rows('Scores');
+  rows('Students').filter(x => x.Status === 'Approved').forEach(st => {
+    const mine = sc.filter(x => x.ID === st.ID);
+    const avg = mine.length ? mine.reduce((a, b) => a + Number(b.Score), 0) / mine.length : 0;
+    if (avg < 60) mail(st.Email, 'Academic notice',
+      'Dear ' + st.Name + ', your cumulative average is ' + Math.round(avg) + '%. Please complete your quizzes to stay above 60%.');
+  });
+}
+function fridayReminder() { // weekly, Friday
+  rows('Students').filter(x => x.Status === 'Approved').forEach(st =>
+    mail(st.Email, 'Reminder: finish this week\'s lecture', 'Dear ' + st.Name + ', complete this week\'s lecture and quiz before the deadline.'));
+}
